@@ -1,7 +1,14 @@
+#!/usr/bin/python3
 import bestin
 
-t = bestin.Bestin('127.0.0.1', 9999, '1.1.1.1')
+t = bestin.Bestin('127.0.0.1', 9999, '1.1.1.1', 10000)
 
-testReq = t.XMLRequest("testreq", "testaction", "dev1", "unit1", "ctrl1")
+req = t.XMLRequest("remote_access_light", "status", 5, "switch1", " ")
 
-t.request("aaaa")
+res = t.requestToWallpad(req)
+
+res2 = t.ParseXMLResponse(res)
+
+print(res)
+
+print(res2)

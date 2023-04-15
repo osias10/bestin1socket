@@ -1,17 +1,26 @@
 import socket
 import logging
+import xmltodict
 
 _LOGGER = logging.getLogger(__name__)
 
 READ_SIZE=4096
 
 class Bestin():
-    def __init__(self, serverIp, serverPort, wallpadIp):
+    def __init__(self, serverIp, serverPort, wallpadIp, wallpadPort):
         self.serverIp = serverIp
         self.serverPort = serverPort
         self.wallpadIp = wallpadIp
-        
-    def request(self, request):
+        self.wallpadPort = wallpadPort
+    
+    def requestToWallpad(self, req):
+        res = self.request(self.wallpadIp, self.wallpadPort, req)
+        return res
+    def requestToServer(self, req):
+        res = self.request(self.serverIp, self.serverPort, req)
+        return res
+
+    def request(self, ip, port, request):
         #_LOGGER.debug('Request --> %s' % request)
         try:
             request = request.encode()
@@ -19,7 +28,8 @@ class Bestin():
             pass
 
         bestinSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        bestinSocket.connect((self.serverIp, self.serverPort))
+        bestinSocket.settimeout(5)
+        bestinSocket.connect((ip, port))
 
         bestinSocket.sendall(request)
 
@@ -47,7 +57,7 @@ class Bestin():
                    f'		<params dev_num = "{dev_num}" unit_num = "{unit_num}" ctrl_action = "{ctrl_action}"/>'
                    '	</service>'
                    '</imap>')
-        return self.request(request)
+        return request
 
     def ParseXMLResponse(self, response):
         '''Parse an XML response, return an array of resuts on success, or False on failure'''
@@ -62,8 +72,20 @@ class Bestin():
                 _LOGGER.error("Failed RPC result: %s" % responsedict)
                 return False
             else:
+                _LOGGER.debug(responsedict['imap']['service']['status_info'])
                 return responsedict['imap']['service']['status_info']
         except:
             _LOGGER.critical("exeption in result parsing")
+            _LOGGER.critical(response)
+            return False
 
         return False
+    def CheckUnitStatus(self, result):
+        try:
+            unitStatus = result['@unit_status']
+            if unitStatus == "on":
+                return True
+            else :
+                return False
+        except:
+            return False
