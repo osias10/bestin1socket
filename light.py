@@ -10,6 +10,7 @@ import homeassistant.helpers.config_validation as cv
 from homeassistant.components.light import (PLATFORM_SCHEMA,
                                             LightEntity)
 from . import bestin
+from . import statusinfo
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,6 +29,8 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Optional('enable_lights', default=True): cv.boolean,
 })
 
+StatusInfo = statusinfo.StatusInfo()
+
 def setup_platform(
     hass: HomeAssistant,
     config: ConfigType,
@@ -40,6 +43,7 @@ def setup_platform(
     wallpadIp = config.get(CONF_WALLPAD_IP)
     wallpadPort = config.get(CONF_WALLPAD_PORT)
 
+    
     lights = []
     for room in config['rooms'].split():
         light = BestinLight(serverIp, serverPort, wallpadIp, wallpadPort, room, "")
@@ -64,7 +68,7 @@ class BestinLight(LightEntity):
         self._btcp = bestin.Bestin(serverIp, serverPort, wallpadIp, wallpadPort)
         self._switch = switch
         self._name = f"BESTIN_LIGHT_room{self._room}_{self._switch}"
-
+        self._roomName = f"BESTIN_LIGHT_room{self._room}"
         #self.coordinator = coordinator
     @property
     def unique_id(self):
@@ -77,26 +81,53 @@ class BestinLight(LightEntity):
     
     @property
     def is_on(self):
-        req = self._btcp.XMLRequest("remote_access_light", "status", self._room, self._switch, "")
-        res = self._btcp.requestToWallpad(req)
-        result = self._btcp.ParseXMLResponse(res)
-
-        if (isinstance(result,list)):
-            status = next((item for item in result if item['@unit_num'] == self._switch), False)
+        statusKey = f"{self._roomName}_{self._switch}"
+        checkStatusInterval = StatusInfo.checkStatus(statusKey)
+        
+        if checkStatusInterval:
+            result = StatusInfo.getStatus(statusKey)
+            #_LOGGER.critical(f"getStatus in StatusList: {self._name}:{result}")
         else :
-            status = result
-        return self._btcp.CheckUnitStatus(status)
+            req = self._btcp.XMLRequest("remote_access_light", "status", self._room, self._switch, "")
+            res = self._btcp.requestToWallpad(req)
+            parseRes = self._btcp.ParseXMLResponse(res)
+            if parseRes != False:
+                if isinstance(parseRes,list):
+                    for st in parseRes :
+                        switchNum = st['@unit_num']
+                        StatusInfo.addStatus(f"{self._roomName}_{switchNum}", self._btcp.CheckUnitStatus(st))
+                    #_LOGGER.critical(f"{self._roomName}_{switchNum}:{StatusInfo.getStatus(statusKey)}")
+                    result = StatusInfo.getStatus(statusKey)
+                else:
+                    switchNum = parseRes['@unit_num']
+                    StatusInfo.addStatus(f"{self._roomName}_{switchNum}", self._btcp.CheckUnitStatus(parseRes))
+                    #_LOGGER.critical(f"{self._roomName}_{switchNum}:{StatusInfo.getStatus(statusKey)}")
+                    result = StatusInfo.getStatus(statusKey)
+            else :
+                _LOGGER.critical(f"fail is_on")
+                result = False
+            #_LOGGER.critical(f"getStatus new: {self._name}:{result}")
+        #_LOGGER.critical(f"{self._name}:{result}")
+        return result
+        # if (isinstance(result,list)):
+        #     status = next((item for item in result if item['@unit_num'] == self._switch), False)
+        # else :
+        #     status = result
+        # return self._btcp.CheckUnitStatus(status)
     
     def turn_on(self):
         req = self._btcp.XMLRequest("remote_access_light", "control", self._room, self._switch, "on")
         res = self._btcp.requestToWallpad(req)
         result = self._btcp.ParseXMLResponse(res)
+        StatusInfo.addStatus(self._name, self._btcp.CheckUnitStatus(result))
+        #_LOGGER.critical(f"turnon: {self._name}:{result}")
         return self._btcp.CheckUnitStatus(result)
     
     def turn_off(self):
         req = self._btcp.XMLRequest("remote_access_light", "control", self._room, self._switch, "off")
         res = self._btcp.requestToWallpad(req)
         result = self._btcp.ParseXMLResponse(res)
+        StatusInfo.addStatus(self._name, self._btcp.CheckUnitStatus(result))
         return self._btcp.CheckUnitStatus(result)
 
     # @property
