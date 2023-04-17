@@ -1,12 +1,13 @@
 import time
 
-delayTime=30
+delayTime = 0.3
+maxDelayTime = 3
 
-class StatusInfo():
+class ExecuteInfo():
     def __init__(self):
         self.statusList={}
 
-    def checkStatus(self, name):
+    def checkTime(self, name):
         
         if name in self.statusList:
             nowTime = time.time()
@@ -17,14 +18,19 @@ class StatusInfo():
                 return False
         else:
                 return False
-    def getStatus(self, name):
-        return (self.statusList[name]["status"])
-    def addStatus(self, name, status):
-        unitStatus = {"status" : status, "time" : time.time()}
+    def delayExecute(self, name):
+        if name in self.statusList:
+            while 
+            nowTime = time.time()
+            statusTime = self.statusList[name]["time"]
+        else:
+            return True
+    def addTime(self, name):
+        unitStatus = {"time" : time.time()}
         self.statusList[name] = unitStatus
-    def getAllStatus(self):
+    def getAllTime(self):
         return self.statusList
-    def getStatusName(self, name):
+    def getTimeName(self, name):
         return self.statusList[name]
-    def removeStatus(self, name):
+    def removeTime(self, name):
         del self.statusList[name]

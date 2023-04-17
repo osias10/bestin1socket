@@ -9,8 +9,17 @@ import homeassistant.helpers.config_validation as cv
 
 from homeassistant.components.light import (PLATFORM_SCHEMA,
                                             LightEntity)
+
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+from datetime import timedelta
+import time
+
 from . import bestin
 from . import statusinfo
+from . import runqueue
+from . import executeinfo
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,7 +38,8 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Optional('enable_lights', default=True): cv.boolean,
 })
 
-StatusInfo = statusinfo.StatusInfo()
+SCAN_INTERVAL = timedelta(seconds=10)
+
 
 def setup_platform(
     hass: HomeAssistant,
@@ -42,6 +52,14 @@ def setup_platform(
     serverPort = config[CONF_SERVER_PORT]
     wallpadIp = config.get(CONF_WALLPAD_IP)
     wallpadPort = config.get(CONF_WALLPAD_PORT)
+
+    global runQueue
+    global StatusInfo
+    global ExecuteInfo
+    StatusInfo = statusinfo.StatusInfo()
+    runQueue = runqueue.RequestQueue(StatusInfo)
+    ExecuteInfo = executeinfo.ExecuteInfo()
+    runQueue.start()
 
     
     lights = []
@@ -86,7 +104,7 @@ class BestinLight(LightEntity):
         
         if checkStatusInterval:
             result = StatusInfo.getStatus(statusKey)
-            #_LOGGER.critical(f"getStatus in StatusList: {self._name}:{result}")
+            _LOGGER.debug(f"getStatus in StatusList: {self._name}:{result}")
         else :
             req = self._btcp.XMLRequest("remote_access_light", "status", self._room, self._switch, "")
             res = self._btcp.requestToWallpad(req)
@@ -106,7 +124,7 @@ class BestinLight(LightEntity):
             else :
                 _LOGGER.critical(f"fail is_on")
                 result = False
-            #_LOGGER.critical(f"getStatus new: {self._name}:{result}")
+            _LOGGER.debug(f"getStatus new: {self._name}:{result}")
         #_LOGGER.critical(f"{self._name}:{result}")
         return result
         # if (isinstance(result,list)):
@@ -116,19 +134,32 @@ class BestinLight(LightEntity):
         # return self._btcp.CheckUnitStatus(status)
     
     def turn_on(self):
-        req = self._btcp.XMLRequest("remote_access_light", "control", self._room, self._switch, "on")
-        res = self._btcp.requestToWallpad(req)
-        result = self._btcp.ParseXMLResponse(res)
-        StatusInfo.addStatus(self._name, self._btcp.CheckUnitStatus(result))
-        #_LOGGER.critical(f"turnon: {self._name}:{result}")
-        return self._btcp.CheckUnitStatus(result)
+        # req = self._btcp.XMLRequest("remote_access_light", "control", self._room, self._switch, "on")
+        # res = self._btcp.requestToWallpad(req)
+        # result = self._btcp.ParseXMLResponse(res)
+        # StatusInfo.addStatus(self._name, self._btcp.CheckUnitStatus(result))
+        # #_LOGGER.critical(f"turnon: {self._name}:{result}")
+        # return self._btcp.CheckUnitStatus(result)
+
+        req = {"turnOn" : {"lightClass" : self, "name": self._name, "arguments" : {"reqname" : "remote_access_light", "action" : "control", "dev_num" : self._room, "unit_num" : self._switch, "ctrl_action" : "on"}}}
+        runQueue.addCommand(req)
+
+        # if ExecuteInfo.checkTime(self._roomName):
+        #     time.sleep(0.3)
+
+        return True
     
     def turn_off(self):
-        req = self._btcp.XMLRequest("remote_access_light", "control", self._room, self._switch, "off")
-        res = self._btcp.requestToWallpad(req)
-        result = self._btcp.ParseXMLResponse(res)
-        StatusInfo.addStatus(self._name, self._btcp.CheckUnitStatus(result))
-        return self._btcp.CheckUnitStatus(result)
+        # req = self._btcp.XMLRequest("remote_access_light", "control", self._room, self._switch, "off")
+        # res = self._btcp.requestToWallpad(req)
+        # result = self._btcp.ParseXMLResponse(res)
+        # StatusInfo.addStatus(self._name, self._btcp.CheckUnitStatus(result))
+        # return self._btcp.CheckUnitStatus(result)
+        
+        req = {"turnOff" : {"lightClass" : self, "name": self._name, "arguments" : {"reqname" : "remote_access_light", "action" : "control", "dev_num" : self._room, "unit_num" : self._switch, "ctrl_action" : "off"}}}
+        runQueue.addCommand(req)
+
+        return True
 
     # @property
     # def should_poll(self):
