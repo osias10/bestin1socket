@@ -125,7 +125,7 @@ class BestinLight(LightEntity):
                 _LOGGER.critical(f"fail is_on")
                 result = False
             _LOGGER.debug(f"getStatus new: {self._name}:{result}")
-        #_LOGGER.critical(f"{self._name}:{result}")
+        # _LOGGER.critical(f"{self._name}:{result}")
         return result
         # if (isinstance(result,list)):
         #     status = next((item for item in result if item['@unit_num'] == self._switch), False)
@@ -141,26 +141,65 @@ class BestinLight(LightEntity):
         # #_LOGGER.critical(f"turnon: {self._name}:{result}")
         # return self._btcp.CheckUnitStatus(result)
 
-        req = {"turnOn" : {"lightClass" : self, "name": self._name, "arguments" : {"reqname" : "remote_access_light", "action" : "control", "dev_num" : self._room, "unit_num" : self._switch, "ctrl_action" : "on"}}}
+        req = {"request" : "turnOn" , "lightClass" : self, "roomName": self._roomName, "name": self._name, "time" : time.time(), "arguments" : {"reqname" : "remote_access_light", "action" : "control", "dev_num" : self._room, "unit_num" : self._switch, "ctrl_action" : "on"}}
         runQueue.addCommand(req)
-
-        # if ExecuteInfo.checkTime(self._roomName):
-        #     time.sleep(0.3)
-
+        
+        # ExecuteInfo.addTime(self._roomName)
+        # if ExecuteInfo.delayExecute(self._roomName):
+        #     _LOGGER.critical(f"execute  turn on")
+        #     ExecuteInfo.addTime(self._roomName)
+        #     req = self._btcp.XMLRequest("remote_access_light", "control", self._room, self._switch, "on")
+        #     res = self._btcp.requestToWallpad(req)
+        #     result = self._btcp.ParseXMLResponse(res)
+        #     self.UpdateStatus(result)
+        #     #_LOGGER.critical(f"turnon: {self._name}:{result}")
+        #     return True
+        # else :
+        #     return False
         return True
     
     def turn_off(self):
+        _LOGGER.critical(f"execute  turn off")
         # req = self._btcp.XMLRequest("remote_access_light", "control", self._room, self._switch, "off")
         # res = self._btcp.requestToWallpad(req)
         # result = self._btcp.ParseXMLResponse(res)
         # StatusInfo.addStatus(self._name, self._btcp.CheckUnitStatus(result))
         # return self._btcp.CheckUnitStatus(result)
         
-        req = {"turnOff" : {"lightClass" : self, "name": self._name, "arguments" : {"reqname" : "remote_access_light", "action" : "control", "dev_num" : self._room, "unit_num" : self._switch, "ctrl_action" : "off"}}}
+        req = {"request" : "turnOff", "lightClass" : self, "roomName": self._roomName, "name": self._name, "time" : time.time(), "arguments" : {"reqname" : "remote_access_light", "action" : "control", "dev_num" : self._room, "unit_num" : self._switch, "ctrl_action" : "off"}}
         runQueue.addCommand(req)
 
-        return True
+        # ExecuteInfo.addTime(self._roomName)
+        # if ExecuteInfo.delayExecute(self._roomName):
+        #     ExecuteInfo.addTime(self._roomName)
+        #     req = self._btcp.XMLRequest("remote_access_light", "control", self._room, self._switch, "off")
+        #     res = self._btcp.requestToWallpad(req)
+        #     result = self._btcp.ParseXMLResponse(res)  
+        #     self.UpdateStatus(result)
+        #     #_LOGGER.critical(f"turnon: {self._name}:{result}")
+        #     return True
+        # else :
+        #     return False
 
+        return True
+    
+    def UpdateStatus(self, parseRes):
+        if parseRes != False:
+            if isinstance(parseRes,list):
+                for st in parseRes :
+                    switchNum = st['@unit_num']
+                    StatusInfo.addStatus(f"{self._roomName}_{switchNum}", self._btcp.CheckUnitStatus(st))
+                    #_LOGGER.debug(f"UpdateSTatus {self._roomName}_{switchNum}:{self.statusInfo.getStatusName(entity._name)}")
+                result = StatusInfo.getStatus(self._name)
+            else:
+                switchNum = parseRes['@unit_num']
+                StatusInfo.addStatus(f"{self._name}", self._btcp.CheckUnitStatus(parseRes))
+                #_LOGGER.critical(f"{self._roomName}_{switchNum}:{StatusInfo.getStatus(statusKey)}")
+                result = StatusInfo.getStatus(self._name)
+        else :
+            _LOGGER.critical(f"fail UpdateStatus")
+            result = False
+    
     # @property
     # def should_poll(self):
     #     """No polling needed."""
